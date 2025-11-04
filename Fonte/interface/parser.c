@@ -41,17 +41,34 @@ inf_query QUERY;
  */
 rc_parser GLOBAL_PARSER;
 
+/* No arquivo parser.c */
 void connect(char *nome) {
-  int r = connectDB(nome);
-	if (r == SUCCESS) {
-    connected.db_name = malloc(sizeof(char)*((strlen(nome)+1)));
-    strcpylower(connected.db_name, nome);
-    connected.conn_active = 1;
-    printf("You are now connected to database \"%s\" as user \"uffsdb\".\n", nome);
-  }
-  else {
-  	printf("ERROR: Failed to establish connection with database named \"%s\". (Error code: %d)\n", nome, r);
-  }
+    char clean_name[256]; // Um buffer local para fazer a limpeza
+
+    /* --- INÍCIO DA CORREÇÃO --- */
+    
+    // 1. Copia a string 'nome' (seja ela read-only ou não) para o buffer local.
+    // Usamos strncpy para evitar estouro de buffer.
+    strncpy(clean_name, nome, sizeof(clean_name) - 1);
+    clean_name[sizeof(clean_name) - 1] = '\0'; // Garante que a string termina com \0
+
+    // 2. Agora, limpamos a *cópia* (clean_name), que é 100% segura para modificar.
+    size_t len = strcspn(clean_name, ";\n");
+    clean_name[len] = '\0';
+    
+    /* --- FIM DA CORREÇÃO --- */
+
+    // 3. Daqui em diante, usamos apenas a string 'clean_name'
+    int r = connectDB(clean_name);
+    if (r == SUCCESS) {
+        connected.db_name = malloc(sizeof(char)*((strlen(clean_name)+1)));
+        strcpylower(connected.db_name, clean_name);
+        connected.conn_active = 1;
+        printf("You are now connected to database \"%s\" as user \"uffsdb\".\n", clean_name);
+    }
+    else {
+        printf("ERROR: Failed to establish connection with database named \"%s\". (Error code: %d)\n", clean_name, r);
+    }
 }
 
 void invalidCommand(char *command) {
@@ -386,10 +403,12 @@ int interface() {
             GLOBAL_PARSER.noerror = 1;
         }
 
-        if (GLOBAL_PARSER.mode != 0) {
-            pthread_create(&pth, NULL, (void*)clearGlobalStructs, NULL);
-            pthread_join(pth, NULL);
-        }
+        // if (GLOBAL_PARSER.mode != 0) {
+        //     pthread_create(&pth, NULL, (void*)clearGlobalStructs, NULL);
+        //     pthread_join(pth, NULL);
+        // }
+        pthread_create(&pth, NULL, (void*)clearGlobalStructs, NULL);
+        pthread_join(pth, NULL);
     
     }
     return 0;
